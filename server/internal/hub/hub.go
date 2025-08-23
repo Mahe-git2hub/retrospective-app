@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
+	"github.com/google/uuid"
 	"live-retro-server/internal/models"
 	"live-retro-server/internal/store"
 )
@@ -146,15 +147,5 @@ func (h *Hub) isValidAdmin(boardID, adminKey string) bool {
 }
 
 func generateUserID() string {
-	// Simple user ID generation - could use UUID in production
-	return "user_" + randomString(8)
-}
-
-func randomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[len(charset)/2] // Simplified for now
-	}
-	return string(b)
+	return "user_" + uuid.New().String()[:8]
 }
