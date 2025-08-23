@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: client-deployment
+  labels:
+    app: live-retro-client
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: live-retro-client
+  template:
+    metadata:
+      labels:
+        app: live-retro-client
+    spec:
+      containers:
+      - name: client
+        image: live-retro-client:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NEXT_PUBLIC_API_URL
+          value: "http://server-service:8080"
+        - name: NEXT_PUBLIC_WS_URL
+          value: "ws://server-service:8080"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: client-service
+spec:
+  selector:
+    app: live-retro-client
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+  type: ClusterIP

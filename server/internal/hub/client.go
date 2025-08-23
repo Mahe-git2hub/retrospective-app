@@ -1,0 +1,405 @@
+package hub
+
+import (
+	"encoding/json"
+	"log"
+	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/google/uuid"
+	"live-retro-server/internal/models"
+)
+
+const (
+	writeWait      = 10 * time.Second
+	pongWait       = 60 * time.Second
+	pingPeriod     = (pongWait * 9) / 10
+	maxMessageSize = 512
+)
+
+func (c *Client) readPump() {
+	defer func() {
+		c.hub.unregister <- c
+		c.conn.Close()
+	}()
+
+	c.conn.SetReadLimit(maxMessageSize)
+	c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.conn.SetPongHandler(func(string) error {
+		c.conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+
+	for {
+		_, message, err := c.conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("WebSocket error: %v", err)
+			}
+			break
+		}
+
+		var wsMsg models.WebSocketMessage
+		if err := json.Unmarshal(message, &wsMsg); err != nil {
+			log.Printf("Error unmarshaling WebSocket message: %v", err)
+			continue
+		}
+
+		c.handleMessage(wsMsg)
+	}
+}
+
+func (c *Client) writePump() {
+	ticker := time.NewTicker(pingPeriod)
+	defer func() {
+		ticker.Stop()
+		c.conn.Close()
+	}()
+
+	for {
+		select {
+		case message, ok := <-c.send:
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if !ok {
+				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
+
+			w, err := c.conn.NextWriter(websocket.TextMessage)
+			if err != nil {
+				return
+			}
+			w.Write(message)
+
+			n := len(c.send)
+			for i := 0; i < n; i++ {
+				w.Write([]byte{'\n'})
+				w.Write(<-c.send)
+			}
+
+			if err := w.Close(); err != nil {
+				return
+			}
+
+		case <-ticker.C:
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return
+			}
+		}
+	}
+}
+
+func (c *Client) handleMessage(msg models.WebSocketMessage) {
+	switch msg.Type {
+	case "client:tile:create":
+		c.handleCreateTile(msg.Payload)
+	case "client:tile:reveal":
+		if c.isAdmin {
+			c.handleRevealTile(msg.Payload)
+		}
+	case "client:tile:vote":
+		c.handleVoteTile(msg.Payload)
+	case "client:column:create":
+		if c.isAdmin {
+			c.handleCreateColumn(msg.Payload)
+		}
+	case "client:column:update":
+		if c.isAdmin {
+			c.handleUpdateColumn(msg.Payload)
+		}
+	case "client:column:delete":
+		if c.isAdmin {
+			c.handleDeleteColumn(msg.Payload)
+		}
+	case "client:user:typing_start":
+		c.handleTypingStart(msg.Payload)
+	case "client:user:typing_stop":
+		c.handleTypingStop(msg.Payload)
+	case "client:thread:create":
+		c.handleCreateThread(msg.Payload)
+	}
+}
+
+func (c *Client) handleCreateTile(payload interface{}) {
+	data, _ := json.Marshal(payload)
+	var createPayload models.CreateTilePayload
+	if err := json.Unmarshal(data, &createPayload); err != nil {
+		log.Printf("Error unmarshaling create tile payload: %v", err)
+		return
+	}
+
+	board, err := c.hub.store.GetBoard(c.boardID)
+	if err != nil {
+		log.Printf("Error getting board: %v", err)
+		return
+	}
+
+	column, exists := board.Columns[createPayload.ColumnID]
+	if !exists {
+		log.Printf("Column %s not found", createPayload.ColumnID)
+		return
+	}
+
+	newTile := &models.Tile{
+		ID:        uuid.New().String(),
+		Content:   createPayload.Content,
+		Author:    createPayload.Author,
+		IsHidden:  true,
+		VoterIDs:  []string{},
+		Threads:   []*models.Thread{},
+		CreatedAt: time.Now(),
+	}
+
+	column.Tiles = append(column.Tiles, newTile)
+
+	if err := c.hub.store.SaveBoard(board); err != nil {
+		log.Printf("Error saving board: %v", err)
+		return
+	}
+
+	c.broadcastBoardState()
+}
+
+func (c *Client) handleRevealTile(payload interface{}) {
+	data, _ := json.Marshal(payload)
+	var revealPayload models.RevealTilePayload
+	if err := json.Unmarshal(data, &revealPayload); err != nil {
+		log.Printf("Error unmarshaling reveal tile payload: %v", err)
+		return
+	}
+
+	board, err := c.hub.store.GetBoard(c.boardID)
+	if err != nil {
+		log.Printf("Error getting board: %v", err)
+		return
+	}
+
+	// Find and reveal the tile
+	for _, column := range board.Columns {
+		for _, tile := range column.Tiles {
+			if tile.ID == revealPayload.TileID {
+				tile.IsHidden = false
+				if err := c.hub.store.SaveBoard(board); err != nil {
+					log.Printf("Error saving board: %v", err)
+					return
+				}
+				c.broadcastBoardState()
+				return
+			}
+		}
+	}
+}
+
+func (c *Client) handleVoteTile(payload interface{}) {
+	data, _ := json.Marshal(payload)
+	var votePayload models.VoteTilePayload
+	if err := json.Unmarshal(data, &votePayload); err != nil {
+		log.Printf("Error unmarshaling vote tile payload: %v", err)
+		return
+	}
+
+	board, err := c.hub.store.GetBoard(c.boardID)
+	if err != nil {
+		log.Printf("Error getting board: %v", err)
+		return
+	}
+
+	// Find the tile and toggle vote
+	for _, column := range board.Columns {
+		for _, tile := range column.Tiles {
+			if tile.ID == votePayload.TileID {
+				// Check if user already voted
+				voted := false
+				for i, voterID := range tile.VoterIDs {
+					if voterID == c.userID {
+						// Remove vote
+						tile.VoterIDs = append(tile.VoterIDs[:i], tile.VoterIDs[i+1:]...)
+						voted = true
+						break
+					}
+				}
+				
+				if !voted {
+					// Add vote
+					tile.VoterIDs = append(tile.VoterIDs, c.userID)
+				}
+
+				if err := c.hub.store.SaveBoard(board); err != nil {
+					log.Printf("Error saving board: %v", err)
+					return
+				}
+				c.broadcastBoardState()
+				return
+			}
+		}
+	}
+}
+
+func (c *Client) handleCreateColumn(payload interface{}) {
+	data, _ := json.Marshal(payload)
+	var createPayload models.CreateColumnPayload
+	if err := json.Unmarshal(data, &createPayload); err != nil {
+		log.Printf("Error unmarshaling create column payload: %v", err)
+		return
+	}
+
+	board, err := c.hub.store.GetBoard(c.boardID)
+	if err != nil {
+		log.Printf("Error getting board: %v", err)
+		return
+	}
+
+	newColumn := &models.Column{
+		ID:    uuid.New().String(),
+		Title: createPayload.Title,
+		Order: len(board.Columns),
+		Tiles: []*models.Tile{},
+	}
+
+	board.Columns[newColumn.ID] = newColumn
+
+	if err := c.hub.store.SaveBoard(board); err != nil {
+		log.Printf("Error saving board: %v", err)
+		return
+	}
+
+	c.broadcastBoardState()
+}
+
+func (c *Client) handleUpdateColumn(payload interface{}) {
+	data, _ := json.Marshal(payload)
+	var updatePayload models.UpdateColumnPayload
+	if err := json.Unmarshal(data, &updatePayload); err != nil {
+		log.Printf("Error unmarshaling update column payload: %v", err)
+		return
+	}
+
+	board, err := c.hub.store.GetBoard(c.boardID)
+	if err != nil {
+		log.Printf("Error getting board: %v", err)
+		return
+	}
+
+	if column, exists := board.Columns[updatePayload.ColumnID]; exists {
+		column.Title = updatePayload.Title
+
+		if err := c.hub.store.SaveBoard(board); err != nil {
+			log.Printf("Error saving board: %v", err)
+			return
+		}
+
+		c.broadcastBoardState()
+	}
+}
+
+func (c *Client) handleDeleteColumn(payload interface{}) {
+	data, _ := json.Marshal(payload)
+	var deletePayload models.DeleteColumnPayload
+	if err := json.Unmarshal(data, &deletePayload); err != nil {
+		log.Printf("Error unmarshaling delete column payload: %v", err)
+		return
+	}
+
+	board, err := c.hub.store.GetBoard(c.boardID)
+	if err != nil {
+		log.Printf("Error getting board: %v", err)
+		return
+	}
+
+	delete(board.Columns, deletePayload.ColumnID)
+
+	if err := c.hub.store.SaveBoard(board); err != nil {
+		log.Printf("Error saving board: %v", err)
+		return
+	}
+
+	c.broadcastBoardState()
+}
+
+func (c *Client) handleTypingStart(payload interface{}) {
+	typingMsg := models.WebSocketMessage{
+		Type: "server:user:is_typing",
+		Payload: map[string]interface{}{
+			"userId":  c.userID,
+			"boardId": c.boardID,
+			"typing":  true,
+		},
+	}
+
+	data, _ := json.Marshal(typingMsg)
+	c.hub.BroadcastToBoard(c.boardID, data)
+}
+
+func (c *Client) handleTypingStop(payload interface{}) {
+	typingMsg := models.WebSocketMessage{
+		Type: "server:user:is_typing",
+		Payload: map[string]interface{}{
+			"userId":  c.userID,
+			"boardId": c.boardID,
+			"typing":  false,
+		},
+	}
+
+	data, _ := json.Marshal(typingMsg)
+	c.hub.BroadcastToBoard(c.boardID, data)
+}
+
+func (c *Client) handleCreateThread(payload interface{}) {
+	data, _ := json.Marshal(payload)
+	var createPayload models.CreateThreadPayload
+	if err := json.Unmarshal(data, &createPayload); err != nil {
+		log.Printf("Error unmarshaling create thread payload: %v", err)
+		return
+	}
+
+	board, err := c.hub.store.GetBoard(c.boardID)
+	if err != nil {
+		log.Printf("Error getting board: %v", err)
+		return
+	}
+
+	// Find the tile and add thread
+	for _, column := range board.Columns {
+		for _, tile := range column.Tiles {
+			if tile.ID == createPayload.TileID {
+				newThread := &models.Thread{
+					ID:        uuid.New().String(),
+					Content:   createPayload.Content,
+					Author:    createPayload.Author,
+					CreatedAt: time.Now(),
+				}
+
+				tile.Threads = append(tile.Threads, newThread)
+
+				if err := c.hub.store.SaveBoard(board); err != nil {
+					log.Printf("Error saving board: %v", err)
+					return
+				}
+				c.broadcastBoardState()
+				return
+			}
+		}
+	}
+}
+
+func (c *Client) broadcastBoardState() {
+	board, err := c.hub.store.GetBoard(c.boardID)
+	if err != nil {
+		log.Printf("Error getting board for broadcast: %v", err)
+		return
+	}
+
+	boardStateMsg := models.WebSocketMessage{
+		Type:    "server:board:state_update",
+		Payload: board,
+	}
+
+	data, err := json.Marshal(boardStateMsg)
+	if err != nil {
+		log.Printf("Error marshaling board state for broadcast: %v", err)
+		return
+	}
+
+	c.hub.BroadcastToBoard(c.boardID, data)
+}
