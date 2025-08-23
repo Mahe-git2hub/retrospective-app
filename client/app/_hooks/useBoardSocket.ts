@@ -121,7 +121,15 @@ export function useBoardSocket(boardId: string, adminKey?: string): UseBoardSock
 
             case 'error':
               console.error('WebSocket error:', message.payload)
+              // Show user-friendly error notification
+              if (typeof window !== 'undefined' && message.payload?.message) {
+                // You could use a toast library here instead
+                alert(`Error: ${message.payload.message}`)
+              }
               break
+              
+            default:
+              console.warn('Unknown WebSocket message type:', message.type)
           }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error)

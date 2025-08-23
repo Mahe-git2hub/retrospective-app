@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { Column as ColumnType, Tile as TileType } from '@/hooks/useBoardSocket'
+import { validateTileContent, validateAuthorName, validateColumnTitle, sanitizeInput } from '@/utils/validation'
 import Tile from './Tile'
 
 interface ColumnProps {
@@ -39,18 +40,38 @@ export default function Column({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const handleAddTile = () => {
-    if (newTileContent.trim()) {
-      onAddTile(column.id, newTileContent, tileAuthor)
-      setNewTileContent('')
-      setTileAuthor('')
-      setIsAddingTile(false)
-      onStopTyping()
+    const contentValidation = validateTileContent(newTileContent)
+    if (!contentValidation.isValid) {
+      alert(contentValidation.error)
+      return
     }
+
+    const authorValidation = validateAuthorName(tileAuthor)
+    if (!authorValidation.isValid) {
+      alert(authorValidation.error)
+      return
+    }
+
+    const sanitizedContent = sanitizeInput(newTileContent)
+    const sanitizedAuthor = sanitizeInput(tileAuthor)
+
+    onAddTile(column.id, sanitizedContent, sanitizedAuthor)
+    setNewTileContent('')
+    setTileAuthor('')
+    setIsAddingTile(false)
+    onStopTyping()
   }
 
   const handleUpdateTitle = () => {
-    if (editTitle.trim() && editTitle !== column.title) {
-      onUpdateColumn(column.id, editTitle.trim())
+    const titleValidation = validateColumnTitle(editTitle)
+    if (!titleValidation.isValid) {
+      alert(titleValidation.error)
+      return
+    }
+
+    const sanitizedTitle = sanitizeInput(editTitle)
+    if (sanitizedTitle && sanitizedTitle !== column.title) {
+      onUpdateColumn(column.id, sanitizedTitle)
     }
     setIsEditingTitle(false)
   }

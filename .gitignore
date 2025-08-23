@@ -85,3 +85,4 @@ temp/
 
 # Project specific
 requirements.md
+.claude/

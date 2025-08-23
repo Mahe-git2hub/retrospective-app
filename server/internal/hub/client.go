@@ -126,8 +126,20 @@ func (c *Client) handleCreateTile(payload interface{}) {
 	var createPayload models.CreateTilePayload
 	if err := json.Unmarshal(data, &createPayload); err != nil {
 		log.Printf("Error unmarshaling create tile payload: %v", err)
+		c.sendErrorMessage("Invalid tile data")
 		return
 	}
+
+	// Validate payload
+	if err := models.ValidateCreateTilePayload(&createPayload); err != nil {
+		log.Printf("Invalid create tile payload: %v", err)
+		c.sendErrorMessage(err.Error())
+		return
+	}
+
+	// Sanitize input
+	createPayload.Content = models.SanitizeString(createPayload.Content)
+	createPayload.Author = models.SanitizeString(createPayload.Author)
 
 	board, err := c.hub.store.GetBoard(c.boardID)
 	if err != nil {
@@ -241,8 +253,19 @@ func (c *Client) handleCreateColumn(payload interface{}) {
 	var createPayload models.CreateColumnPayload
 	if err := json.Unmarshal(data, &createPayload); err != nil {
 		log.Printf("Error unmarshaling create column payload: %v", err)
+		c.sendErrorMessage("Invalid column data")
 		return
 	}
+
+	// Validate payload
+	if err := models.ValidateCreateColumnPayload(&createPayload); err != nil {
+		log.Printf("Invalid create column payload: %v", err)
+		c.sendErrorMessage(err.Error())
+		return
+	}
+
+	// Sanitize input
+	createPayload.Title = models.SanitizeString(createPayload.Title)
 
 	board, err := c.hub.store.GetBoard(c.boardID)
 	if err != nil {
@@ -390,6 +413,9 @@ func (c *Client) broadcastBoardState() {
 		return
 	}
 
+	// Sanitize board data before broadcasting
+	models.SanitizeBoard(board)
+
 	boardStateMsg := models.WebSocketMessage{
 		Type:    "server:board:state_update",
 		Payload: board,
@@ -402,4 +428,25 @@ func (c *Client) broadcastBoardState() {
 	}
 
 	c.hub.BroadcastToBoard(c.boardID, data)
+}
+
+func (c *Client) sendErrorMessage(message string) {
+	errorMsg := models.WebSocketMessage{
+		Type: "error",
+		Payload: map[string]interface{}{
+			"message": message,
+		},
+	}
+
+	data, err := json.Marshal(errorMsg)
+	if err != nil {
+		log.Printf("Error marshaling error message: %v", err)
+		return
+	}
+
+	select {
+	case c.send <- data:
+	default:
+		log.Printf("Failed to send error message to client")
+	}
 }
