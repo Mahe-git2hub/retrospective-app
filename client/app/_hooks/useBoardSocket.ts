@@ -122,12 +122,8 @@ export function useBoardSocket(boardId: string, adminKey?: string): UseBoardSock
           console.error('WebSocket error:', error)
           setConnected(false)
         }
-      } catch (error) {
-        console.error('Failed to create WebSocket:', error)
-        setConnected(false)
-      }
 
-      wsRef.current.onmessage = (event) => {
+        wsRef.current.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data)
           
@@ -138,10 +134,10 @@ export function useBoardSocket(boardId: string, adminKey?: string): UseBoardSock
             
             case 'server:user:is_typing':
               const { userId, typing } = message.payload
-              setTypingUsers(prev => ({
-                ...prev,
+              setTypingUsers({
+                ...typingUsers,
                 [userId]: typing
-              }))
+              })
               break
 
             case 'error':
@@ -160,6 +156,10 @@ export function useBoardSocket(boardId: string, adminKey?: string): UseBoardSock
         } catch (error) {
           console.error('Error parsing WebSocket message:', error)
         }
+      }
+      } catch (error) {
+        console.error('Failed to create WebSocket:', error)
+        setConnected(false)
       }
     }
 

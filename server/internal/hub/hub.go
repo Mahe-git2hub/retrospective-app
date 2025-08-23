@@ -57,7 +57,7 @@ func (h *Hub) Run() {
 			// Send current board state to new client
 			board, err := h.store.GetBoard(client.boardID)
 			if err != nil {
-				log.Printf("Error getting board %s: %v", client.boardID, err)
+				logger.Errorf("Error getting board %s: %v", client.boardID, err)
 				continue
 			}
 			
@@ -68,7 +68,7 @@ func (h *Hub) Run() {
 			
 			data, err := json.Marshal(boardStateMsg)
 			if err != nil {
-				log.Printf("Error marshaling board state: %v", err)
+				logger.Errorf("Error marshaling board state: %v", err)
 				continue
 			}
 			
