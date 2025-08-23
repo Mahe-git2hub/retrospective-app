@@ -1,7 +1,10 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 import { Board as BoardType, Column as ColumnType, useBoardSocket } from '@/hooks/useBoardSocket'
+import { useToast } from '@/hooks/useToast'
+import { ToastContainer } from '@/components/ui/Toast'
+import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Column from './Column'
 import TypingIndicator from './TypingIndicator'
 import html2canvas from 'html2canvas'
@@ -14,6 +17,8 @@ interface BoardProps {
 
 export default function Board({ boardId, adminKey, isAdmin = false }: BoardProps) {
   const boardRef = useRef<HTMLDivElement>(null)
+  const { toasts, removeToast, success, error, info } = useToast()
+  
   const {
     board,
     isConnected,
@@ -29,9 +34,23 @@ export default function Board({ boardId, adminKey, isAdmin = false }: BoardProps
     stopTyping,
   } = useBoardSocket(boardId, adminKey)
 
+  // Listen for WebSocket errors
+  useEffect(() => {
+    const handleWebSocketError = (event: any) => {
+      error(event.detail.message)
+    }
+
+    window.addEventListener('websocket-error', handleWebSocketError)
+    return () => {
+      window.removeEventListener('websocket-error', handleWebSocketError)
+    }
+  }, [error])
+
   const exportToImage = async () => {
     if (!boardRef.current) return
 
+    info('Generating board image...')
+    
     try {
       const canvas = await html2canvas(boardRef.current, {
         backgroundColor: '#1a1a1a',
@@ -44,9 +63,11 @@ export default function Board({ boardId, adminKey, isAdmin = false }: BoardProps
       link.download = `retro-board-${boardId}-${new Date().toISOString().split('T')[0]}.png`
       link.href = canvas.toDataURL()
       link.click()
-    } catch (error) {
-      console.error('Failed to export board:', error)
-      alert('Failed to export board. Please try again.')
+      
+      success('Board exported successfully!')
+    } catch (exportError) {
+      console.error('Failed to export board:', exportError)
+      error('Failed to export board. Please try again.')
     }
   }
 
@@ -60,9 +81,9 @@ export default function Board({ boardId, adminKey, isAdmin = false }: BoardProps
   const copyParticipantLink = () => {
     const participantUrl = `${window.location.origin}/${boardId}`
     navigator.clipboard.writeText(participantUrl).then(() => {
-      alert('Participant link copied to clipboard!')
+      success('Participant link copied to clipboard!')
     }).catch(() => {
-      alert(`Participant link: ${participantUrl}`)
+      info(`Participant link: ${participantUrl}`)
     })
   }
 
@@ -70,11 +91,18 @@ export default function Board({ boardId, adminKey, isAdmin = false }: BoardProps
     return (
       <div className="min-h-screen bg-dark-bg flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-300">
+          <LoadingSpinner size="lg" className="mx-auto mb-4" />
+          <p className="text-gray-300 mb-2">
             {isConnected ? 'Loading board...' : 'Connecting to board...'}
           </p>
+          {!isConnected && (
+            <div className="flex items-center justify-center space-x-2 text-sm text-gray-400">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+              <span>Disconnected</span>
+            </div>
+          )}
         </div>
+        <ToastContainer toasts={toasts} onRemove={removeToast} />
       </div>
     )
   }
@@ -92,9 +120,9 @@ export default function Board({ boardId, adminKey, isAdmin = false }: BoardProps
               Live Retro
             </h1>
             <div className="flex items-center space-x-2">
-              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
               <span className="text-sm text-gray-500 dark:text-gray-400">
-                {isConnected ? 'Connected' : 'Disconnected'}
+                {isConnected ? 'Connected' : 'Reconnecting...'}
               </span>
             </div>
             {isAdmin && (
@@ -192,6 +220,9 @@ export default function Board({ boardId, adminKey, isAdmin = false }: BoardProps
       <div className="fixed bottom-4 left-4 text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-lg">
         Board auto-deletes after 30min of inactivity
       </div>
+
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   )
 }

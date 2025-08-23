@@ -70,11 +70,16 @@ export interface UseBoardSocketReturn {
 
 export function useBoardSocket(boardId: string, adminKey?: string): UseBoardSocketReturn {
   const wsRef = useRef<WebSocket | null>(null)
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const reconnectAttemptsRef = useRef(0)
+  const maxReconnectAttempts = 5
   const { board, isConnected, typingUsers, setBoard, setConnected, setTypingUsers } = useBoardStore()
 
   const sendMessage = (type: string, payload: any) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type, payload }))
+    } else {
+      console.warn('WebSocket not connected, message not sent:', { type, payload })
     }
   }
 
@@ -84,22 +89,42 @@ export function useBoardSocket(boardId: string, adminKey?: string): UseBoardSock
     const wsUrl = `${process.env.NEXT_PUBLIC_WS_URL?.replace('http', 'ws')}/ws?boardId=${boardId}${adminKey ? `&adminKey=${adminKey}` : ''}`
     
     const connect = () => {
-      wsRef.current = new WebSocket(wsUrl)
-
-      wsRef.current.onopen = () => {
-        console.log('WebSocket connected')
-        setConnected(true)
+      if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+        console.error('Max reconnection attempts reached')
+        return
       }
 
-      wsRef.current.onclose = () => {
-        console.log('WebSocket disconnected')
+      try {
+        wsRef.current = new WebSocket(wsUrl)
+
+        wsRef.current.onopen = () => {
+          console.log('WebSocket connected')
+          setConnected(true)
+          reconnectAttemptsRef.current = 0 // Reset on successful connection
+        }
+
+        wsRef.current.onclose = (event) => {
+          console.log('WebSocket disconnected:', event.code, event.reason)
+          setConnected(false)
+          
+          // Only reconnect if it wasn't a deliberate close
+          if (event.code !== 1000 && reconnectAttemptsRef.current < maxReconnectAttempts) {
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 10000) // Exponential backoff, max 10s
+            reconnectAttemptsRef.current++
+            
+            console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`)
+            
+            reconnectTimeoutRef.current = setTimeout(connect, delay)
+          }
+        }
+
+        wsRef.current.onerror = (error) => {
+          console.error('WebSocket error:', error)
+          setConnected(false)
+        }
+      } catch (error) {
+        console.error('Failed to create WebSocket:', error)
         setConnected(false)
-        // Reconnect after 3 seconds
-        setTimeout(connect, 3000)
-      }
-
-      wsRef.current.onerror = (error) => {
-        console.error('WebSocket error:', error)
       }
 
       wsRef.current.onmessage = (event) => {
@@ -121,10 +146,11 @@ export function useBoardSocket(boardId: string, adminKey?: string): UseBoardSock
 
             case 'error':
               console.error('WebSocket error:', message.payload)
-              // Show user-friendly error notification
+              // Dispatch custom event for error handling
               if (typeof window !== 'undefined' && message.payload?.message) {
-                // You could use a toast library here instead
-                alert(`Error: ${message.payload.message}`)
+                window.dispatchEvent(new CustomEvent('websocket-error', {
+                  detail: { message: message.payload.message }
+                }))
               }
               break
               
@@ -140,8 +166,11 @@ export function useBoardSocket(boardId: string, adminKey?: string): UseBoardSock
     connect()
 
     return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current)
+      }
       if (wsRef.current) {
-        wsRef.current.close()
+        wsRef.current.close(1000, 'Component unmounting')
       }
     }
   }, [boardId, adminKey, setBoard, setConnected, setTypingUsers])

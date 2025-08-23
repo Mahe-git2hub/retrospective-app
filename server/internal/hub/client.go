@@ -21,6 +21,8 @@ func (c *Client) readPump() {
 	defer func() {
 		c.hub.unregister <- c
 		c.conn.Close()
+		monitoring.DecrementConnections()
+		logger.Debugf("WebSocket connection closed: board=%s, user=%s", c.boardID, c.userID)
 	}()
 
 	c.conn.SetReadLimit(maxMessageSize)
@@ -34,17 +36,21 @@ func (c *Client) readPump() {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket error: %v", err)
+				logger.Errorf("WebSocket unexpected close: %v", err)
 			}
 			break
 		}
 
+		monitoring.IncrementMessages()
+
 		var wsMsg models.WebSocketMessage
 		if err := json.Unmarshal(message, &wsMsg); err != nil {
-			log.Printf("Error unmarshaling WebSocket message: %v", err)
+			logger.Errorf("Error unmarshaling WebSocket message: %v", err)
+			monitoring.IncrementMessageErrors()
 			continue
 		}
 
+		logger.Debugf("Received message: type=%s, board=%s, user=%s", wsMsg.Type, c.boardID, c.userID)
 		c.handleMessage(wsMsg)
 	}
 }

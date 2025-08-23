@@ -2,12 +2,13 @@ package hub
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 
 	"github.com/gorilla/websocket"
 	"github.com/google/uuid"
+	"live-retro-server/internal/logger"
 	"live-retro-server/internal/models"
+	"live-retro-server/internal/monitoring"
 	"live-retro-server/internal/store"
 )
 
@@ -108,20 +109,27 @@ func (h *Hub) BroadcastToBoard(boardID string, message []byte) {
 func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request, boardID, adminKey string) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("WebSocket upgrade error: %v", err)
+		logger.Errorf("WebSocket upgrade error: %v", err)
 		return
 	}
 
+	// Track connection metrics
+	monitoring.IncrementConnections()
+
 	// Check if board exists
 	if !h.store.BoardExists(boardID) {
+		logger.Warnf("WebSocket connection attempted for non-existent board: %s", boardID)
 		conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"error","payload":{"message":"Board not found"}}`))
 		conn.Close()
+		monitoring.DecrementConnections()
 		return
 	}
 
 	// Generate user ID and check if admin
 	userID := generateUserID()
 	isAdmin := adminKey != "" && h.isValidAdmin(boardID, adminKey)
+
+	logger.Debugf("New WebSocket connection: board=%s, user=%s, admin=%t", boardID, userID, isAdmin)
 
 	client := &Client{
 		hub:     h,
