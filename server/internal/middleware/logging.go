@@ -1,9 +1,11 @@
 package middleware
 
 import (
-	"log"
 	"net/http"
+	"strings"
 	"time"
+	
+	"live-retro-server/internal/logger"
 )
 
 type responseWriter struct {
@@ -33,11 +35,27 @@ func (rw *responseWriter) WriteHeader(code int) {
 func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		wrapped := wrapResponseWriter(w)
 		
+		// Skip wrapping for WebSocket endpoints to preserve http.Hijacker
+		if strings.HasPrefix(r.URL.Path, "/ws") {
+			next.ServeHTTP(w, r)
+			
+			// Log WebSocket connections differently since we can't capture status
+			logger.Infof(
+				"[%s] %s %s WebSocket %v %s",
+				r.Method,
+				r.RequestURI,
+				r.RemoteAddr,
+				time.Since(start),
+				r.UserAgent(),
+			)
+			return
+		}
+		
+		wrapped := wrapResponseWriter(w)
 		next.ServeHTTP(wrapped, r)
 		
-		log.Printf(
+		logger.Infof(
 			"[%s] %s %s %d %v %s",
 			r.Method,
 			r.RequestURI,
@@ -51,12 +69,15 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 
 func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Security headers
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("X-Frame-Options", "DENY")
-		w.Header().Set("X-XSS-Protection", "1; mode=block")
-		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'")
+		// Skip security headers for WebSocket endpoints as they're not relevant
+		if !strings.HasPrefix(r.URL.Path, "/ws") {
+			// Security headers
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			w.Header().Set("X-Frame-Options", "DENY")
+			w.Header().Set("X-XSS-Protection", "1; mode=block")
+			w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'")
+		}
 		
 		next.ServeHTTP(w, r)
 	})

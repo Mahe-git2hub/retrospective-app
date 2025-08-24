@@ -13,7 +13,22 @@ import (
 	"live-retro-server/internal/middleware"
 	"live-retro-server/internal/monitoring"
 	"live-retro-server/internal/store"
+	"strings"
 )
+
+// conditionalCompress applies compression to all requests except WebSocket endpoints
+func conditionalCompress(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip compression for WebSocket endpoints
+		if strings.HasPrefix(r.URL.Path, "/ws") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		
+		// Apply compression for all other endpoints
+		handlers.CompressHandler(next).ServeHTTP(w, r)
+	})
+}
 
 func main() {
 	// Load configuration
@@ -63,8 +78,8 @@ func main() {
 	handler = middleware.LoggingMiddleware(handler)
 	handler = rateLimiter.Limit()(handler)
 	
-	// Add compression
-	handler = handlers.CompressHandler(handler)
+	// Add compression - exclude WebSocket endpoints
+	handler = conditionalCompress(handler)
 
 	logger.Infof("Rate limiting: %d req/sec with burst of %d", cfg.RateLimitRPS, cfg.RateLimitBurst)
 	logger.Infof("CORS origins: %v", cfg.CORSOrigins)

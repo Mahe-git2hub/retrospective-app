@@ -62,6 +62,14 @@ func ValidateUpdateColumnPayload(payload *UpdateColumnPayload) error {
 	return nil
 }
 
+func ValidateDeleteColumnPayload(payload *DeleteColumnPayload) error {
+	if payload.ColumnID == "" {
+		return fmt.Errorf("column ID is required")
+	}
+
+	return nil
+}
+
 func ValidateCreateThreadPayload(payload *CreateThreadPayload) error {
 	if payload.TileID == "" {
 		return fmt.Errorf("tile ID is required")

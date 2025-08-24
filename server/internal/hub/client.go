@@ -2,7 +2,6 @@ package hub
 
 import (
 	"encoding/json"
-	"log"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -79,10 +78,16 @@ func (c *Client) writePump() {
 			}
 			w.Write(message)
 
+			// Batch additional messages if any are queued
 			n := len(c.send)
 			for i := 0; i < n; i++ {
-				w.Write([]byte{'\n'})
-				w.Write(<-c.send)
+				select {
+				case additionalMsg := <-c.send:
+					w.Write([]byte{'\n'})
+					w.Write(additionalMsg)
+				default:
+					break
+				}
 			}
 
 			if err := w.Close(); err != nil {
@@ -133,14 +138,14 @@ func (c *Client) handleCreateTile(payload interface{}) {
 	data, _ := json.Marshal(payload)
 	var createPayload models.CreateTilePayload
 	if err := json.Unmarshal(data, &createPayload); err != nil {
-		log.Printf("Error unmarshaling create tile payload: %v", err)
+		logger.Errorf("Error unmarshaling create tile payload: %v", err)
 		c.sendErrorMessage("Invalid tile data")
 		return
 	}
 
 	// Validate payload
 	if err := models.ValidateCreateTilePayload(&createPayload); err != nil {
-		log.Printf("Invalid create tile payload: %v", err)
+		logger.Errorf("Invalid create tile payload: %v", err)
 		c.sendErrorMessage(err.Error())
 		return
 	}
@@ -151,13 +156,13 @@ func (c *Client) handleCreateTile(payload interface{}) {
 
 	board, err := c.hub.store.GetBoard(c.boardID)
 	if err != nil {
-		log.Printf("Error getting board: %v", err)
+		logger.Errorf("Error getting board: %v", err)
 		return
 	}
 
 	column, exists := board.Columns[createPayload.ColumnID]
 	if !exists {
-		log.Printf("Column %s not found", createPayload.ColumnID)
+		logger.Errorf("Column %s not found", createPayload.ColumnID)
 		return
 	}
 
@@ -174,7 +179,7 @@ func (c *Client) handleCreateTile(payload interface{}) {
 	column.Tiles = append(column.Tiles, newTile)
 
 	if err := c.hub.store.SaveBoard(board); err != nil {
-		log.Printf("Error saving board: %v", err)
+		logger.Errorf("Error saving board: %v", err)
 		return
 	}
 
@@ -185,13 +190,13 @@ func (c *Client) handleRevealTile(payload interface{}) {
 	data, _ := json.Marshal(payload)
 	var revealPayload models.RevealTilePayload
 	if err := json.Unmarshal(data, &revealPayload); err != nil {
-		log.Printf("Error unmarshaling reveal tile payload: %v", err)
+		logger.Errorf("Error unmarshaling reveal tile payload: %v", err)
 		return
 	}
 
 	board, err := c.hub.store.GetBoard(c.boardID)
 	if err != nil {
-		log.Printf("Error getting board: %v", err)
+		logger.Errorf("Error getting board: %v", err)
 		return
 	}
 
@@ -201,7 +206,7 @@ func (c *Client) handleRevealTile(payload interface{}) {
 			if tile.ID == revealPayload.TileID {
 				tile.IsHidden = false
 				if err := c.hub.store.SaveBoard(board); err != nil {
-					log.Printf("Error saving board: %v", err)
+					logger.Errorf("Error saving board: %v", err)
 					return
 				}
 				c.broadcastBoardState()
@@ -215,13 +220,13 @@ func (c *Client) handleVoteTile(payload interface{}) {
 	data, _ := json.Marshal(payload)
 	var votePayload models.VoteTilePayload
 	if err := json.Unmarshal(data, &votePayload); err != nil {
-		log.Printf("Error unmarshaling vote tile payload: %v", err)
+		logger.Errorf("Error unmarshaling vote tile payload: %v", err)
 		return
 	}
 
 	board, err := c.hub.store.GetBoard(c.boardID)
 	if err != nil {
-		log.Printf("Error getting board: %v", err)
+		logger.Errorf("Error getting board: %v", err)
 		return
 	}
 
@@ -246,7 +251,7 @@ func (c *Client) handleVoteTile(payload interface{}) {
 				}
 
 				if err := c.hub.store.SaveBoard(board); err != nil {
-					log.Printf("Error saving board: %v", err)
+					logger.Errorf("Error saving board: %v", err)
 					return
 				}
 				c.broadcastBoardState()
@@ -260,14 +265,14 @@ func (c *Client) handleCreateColumn(payload interface{}) {
 	data, _ := json.Marshal(payload)
 	var createPayload models.CreateColumnPayload
 	if err := json.Unmarshal(data, &createPayload); err != nil {
-		log.Printf("Error unmarshaling create column payload: %v", err)
+		logger.Errorf("Error unmarshaling create column payload: %v", err)
 		c.sendErrorMessage("Invalid column data")
 		return
 	}
 
 	// Validate payload
 	if err := models.ValidateCreateColumnPayload(&createPayload); err != nil {
-		log.Printf("Invalid create column payload: %v", err)
+		logger.Errorf("Invalid create column payload: %v", err)
 		c.sendErrorMessage(err.Error())
 		return
 	}
@@ -277,7 +282,7 @@ func (c *Client) handleCreateColumn(payload interface{}) {
 
 	board, err := c.hub.store.GetBoard(c.boardID)
 	if err != nil {
-		log.Printf("Error getting board: %v", err)
+		logger.Errorf("Error getting board: %v", err)
 		return
 	}
 
@@ -291,7 +296,7 @@ func (c *Client) handleCreateColumn(payload interface{}) {
 	board.Columns[newColumn.ID] = newColumn
 
 	if err := c.hub.store.SaveBoard(board); err != nil {
-		log.Printf("Error saving board: %v", err)
+		logger.Errorf("Error saving board: %v", err)
 		return
 	}
 
@@ -302,13 +307,24 @@ func (c *Client) handleUpdateColumn(payload interface{}) {
 	data, _ := json.Marshal(payload)
 	var updatePayload models.UpdateColumnPayload
 	if err := json.Unmarshal(data, &updatePayload); err != nil {
-		log.Printf("Error unmarshaling update column payload: %v", err)
+		logger.Errorf("Error unmarshaling update column payload: %v", err)
+		c.sendErrorMessage("Invalid column update data")
 		return
 	}
 
+	// Validate payload
+	if err := models.ValidateUpdateColumnPayload(&updatePayload); err != nil {
+		logger.Errorf("Invalid update column payload: %v", err)
+		c.sendErrorMessage(err.Error())
+		return
+	}
+
+	// Sanitize input
+	updatePayload.Title = models.SanitizeString(updatePayload.Title)
+
 	board, err := c.hub.store.GetBoard(c.boardID)
 	if err != nil {
-		log.Printf("Error getting board: %v", err)
+		logger.Errorf("Error getting board: %v", err)
 		return
 	}
 
@@ -316,11 +332,14 @@ func (c *Client) handleUpdateColumn(payload interface{}) {
 		column.Title = updatePayload.Title
 
 		if err := c.hub.store.SaveBoard(board); err != nil {
-			log.Printf("Error saving board: %v", err)
+			logger.Errorf("Error saving board: %v", err)
 			return
 		}
 
 		c.broadcastBoardState()
+	} else {
+		logger.Errorf("Column %s not found for update", updatePayload.ColumnID)
+		c.sendErrorMessage("Column not found")
 	}
 }
 
@@ -328,24 +347,37 @@ func (c *Client) handleDeleteColumn(payload interface{}) {
 	data, _ := json.Marshal(payload)
 	var deletePayload models.DeleteColumnPayload
 	if err := json.Unmarshal(data, &deletePayload); err != nil {
-		log.Printf("Error unmarshaling delete column payload: %v", err)
+		logger.Errorf("Error unmarshaling delete column payload: %v", err)
+		c.sendErrorMessage("Invalid column delete data")
+		return
+	}
+
+	// Validate payload
+	if err := models.ValidateDeleteColumnPayload(&deletePayload); err != nil {
+		logger.Errorf("Invalid delete column payload: %v", err)
+		c.sendErrorMessage(err.Error())
 		return
 	}
 
 	board, err := c.hub.store.GetBoard(c.boardID)
 	if err != nil {
-		log.Printf("Error getting board: %v", err)
+		logger.Errorf("Error getting board: %v", err)
 		return
 	}
 
-	delete(board.Columns, deletePayload.ColumnID)
+	if _, exists := board.Columns[deletePayload.ColumnID]; exists {
+		delete(board.Columns, deletePayload.ColumnID)
 
-	if err := c.hub.store.SaveBoard(board); err != nil {
-		log.Printf("Error saving board: %v", err)
-		return
+		if err := c.hub.store.SaveBoard(board); err != nil {
+			logger.Errorf("Error saving board: %v", err)
+			return
+		}
+
+		c.broadcastBoardState()
+	} else {
+		logger.Errorf("Column %s not found for deletion", deletePayload.ColumnID)
+		c.sendErrorMessage("Column not found")
 	}
-
-	c.broadcastBoardState()
 }
 
 func (c *Client) handleTypingStart(payload interface{}) {
@@ -380,13 +412,25 @@ func (c *Client) handleCreateThread(payload interface{}) {
 	data, _ := json.Marshal(payload)
 	var createPayload models.CreateThreadPayload
 	if err := json.Unmarshal(data, &createPayload); err != nil {
-		log.Printf("Error unmarshaling create thread payload: %v", err)
+		logger.Errorf("Error unmarshaling create thread payload: %v", err)
+		c.sendErrorMessage("Invalid thread data")
 		return
 	}
 
+	// Validate payload
+	if err := models.ValidateCreateThreadPayload(&createPayload); err != nil {
+		logger.Errorf("Invalid create thread payload: %v", err)
+		c.sendErrorMessage(err.Error())
+		return
+	}
+
+	// Sanitize input
+	createPayload.Content = models.SanitizeString(createPayload.Content)
+	createPayload.Author = models.SanitizeString(createPayload.Author)
+
 	board, err := c.hub.store.GetBoard(c.boardID)
 	if err != nil {
-		log.Printf("Error getting board: %v", err)
+		logger.Errorf("Error getting board: %v", err)
 		return
 	}
 
@@ -404,7 +448,7 @@ func (c *Client) handleCreateThread(payload interface{}) {
 				tile.Threads = append(tile.Threads, newThread)
 
 				if err := c.hub.store.SaveBoard(board); err != nil {
-					log.Printf("Error saving board: %v", err)
+					logger.Errorf("Error saving board: %v", err)
 					return
 				}
 				c.broadcastBoardState()
@@ -417,7 +461,7 @@ func (c *Client) handleCreateThread(payload interface{}) {
 func (c *Client) broadcastBoardState() {
 	board, err := c.hub.store.GetBoard(c.boardID)
 	if err != nil {
-		log.Printf("Error getting board for broadcast: %v", err)
+		logger.Errorf("Error getting board for broadcast: %v", err)
 		return
 	}
 
@@ -431,7 +475,7 @@ func (c *Client) broadcastBoardState() {
 
 	data, err := json.Marshal(boardStateMsg)
 	if err != nil {
-		log.Printf("Error marshaling board state for broadcast: %v", err)
+		logger.Errorf("Error marshaling board state for broadcast: %v", err)
 		return
 	}
 
@@ -448,13 +492,13 @@ func (c *Client) sendErrorMessage(message string) {
 
 	data, err := json.Marshal(errorMsg)
 	if err != nil {
-		log.Printf("Error marshaling error message: %v", err)
+		logger.Errorf("Error marshaling error message: %v", err)
 		return
 	}
 
 	select {
 	case c.send <- data:
 	default:
-		log.Printf("Failed to send error message to client")
+		logger.Errorf("Failed to send error message to client")
 	}
 }

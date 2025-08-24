@@ -3,6 +3,7 @@ package hub
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/google/uuid"
@@ -33,16 +34,23 @@ type Hub struct {
 	register   chan *Client
 	unregister chan *Client
 	store      *store.RedisStore
+	cleanup    chan string // boardID to cleanup
 }
 
 func NewHub(store *store.RedisStore) *Hub {
-	return &Hub{
+	hub := &Hub{
 		clients:    make(map[string]map[*Client]bool),
 		broadcast:  make(chan []byte, 256),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		store:      store,
+		cleanup:    make(chan string, 256),
 	}
+	
+	// Start cleanup routine for expired boards
+	go hub.cleanupExpiredBoards()
+	
+	return hub
 }
 
 func (h *Hub) Run() {
@@ -89,6 +97,9 @@ func (h *Hub) Run() {
 					}
 				}
 			}
+
+		case boardID := <-h.cleanup:
+			h.cleanupBoard(boardID)
 		}
 	}
 }
@@ -156,4 +167,66 @@ func (h *Hub) isValidAdmin(boardID, adminKey string) bool {
 
 func generateUserID() string {
 	return "user_" + uuid.New().String()[:8]
+}
+
+// cleanupExpiredBoards runs periodically to clean up connections to expired boards
+func (h *Hub) cleanupExpiredBoards() {
+	ticker := time.NewTicker(5 * time.Minute) // Check every 5 minutes
+	defer ticker.Stop()
+	
+	for range ticker.C {
+		// Get all board IDs that have active connections
+		var boardIDs []string
+		for boardID := range h.clients {
+			boardIDs = append(boardIDs, boardID)
+		}
+		
+		// Check if each board still exists in Redis
+		for _, boardID := range boardIDs {
+			if !h.store.BoardExists(boardID) {
+				logger.Debugf("Cleaning up expired board: %s", boardID)
+				select {
+				case h.cleanup <- boardID:
+				default:
+					logger.Warnf("Cleanup channel full, skipping board: %s", boardID)
+				}
+			}
+		}
+	}
+}
+
+// cleanupBoard forcibly disconnects all clients from an expired board
+func (h *Hub) cleanupBoard(boardID string) {
+	if clients, ok := h.clients[boardID]; ok {
+		logger.Infof("Cleaning up %d clients for expired board: %s", len(clients), boardID)
+		
+		// Send close message to all clients
+		closeMsg := models.WebSocketMessage{
+			Type: "server:board:expired",
+			Payload: map[string]interface{}{
+				"message": "Board has expired due to inactivity",
+			},
+		}
+		
+		if data, err := json.Marshal(closeMsg); err == nil {
+			for client := range clients {
+				select {
+				case client.send <- data:
+				default:
+					// Channel might be closed, ignore
+				}
+				// Force close the connection
+				client.conn.Close()
+			}
+		}
+		
+		// Remove all clients for this board and adjust connection count
+		clientCount := len(clients)
+		delete(h.clients, boardID)
+		
+		// Decrement connection counter for each closed client
+		for i := 0; i < clientCount; i++ {
+			monitoring.DecrementConnections()
+		}
+	}
 }
