@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Tile as TileType, Thread } from '@/hooks/useBoardSocket'
-import { MAX_THREAD_CONTENT_LENGTH, MAX_AUTHOR_NAME_LENGTH } from '@/utils/validation'
+import { getCharacterCount, MAX_THREAD_CONTENT_LENGTH, MAX_AUTHOR_NAME_LENGTH } from '@/utils/validation'
 
 interface TileProps {
   tile: TileType
@@ -140,7 +140,7 @@ export default function Tile({ tile, isAdmin, onReveal, onVote, onAddThread, cur
                   style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
                 />
                 <div className="text-xs text-gray-400 mt-1">
-                  {[...threadAuthor].length}/{MAX_AUTHOR_NAME_LENGTH}
+                  {getCharacterCount(threadAuthor)}/{MAX_AUTHOR_NAME_LENGTH}
                 </div>
               </div>
               
@@ -154,7 +154,7 @@ export default function Tile({ tile, isAdmin, onReveal, onVote, onAddThread, cur
                   rows={2}
                 />
                 <div className="text-xs text-gray-400 mt-1">
-                  {[...newThreadContent].length}/{MAX_THREAD_CONTENT_LENGTH}
+                  {getCharacterCount(newThreadContent)}/{MAX_THREAD_CONTENT_LENGTH}
                 </div>
               </div>
               

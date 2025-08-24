@@ -1,3 +1,8 @@
+// Live Retro - Real-time ephemeral retrospective boards
+// Copyright (c) 2024 Mahe-git2hub
+// Licensed under MIT License - Attribution Required
+// See LICENSE file for full terms
+
 import './globals.css'
 import { Inter } from 'next/font/google'
 

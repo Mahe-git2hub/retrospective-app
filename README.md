@@ -194,7 +194,22 @@ The application follows a clean architecture pattern:
 
 ## License
 
-[Add your license information here]
+This project is licensed under the MIT License with attribution requirements.
+
+**Copyright (c) 2024 Mahe-git2hub**
+
+### Usage Requirements
+
+This software may be used freely for both personal and commercial purposes, but **ALL USES MUST INCLUDE ATTRIBUTION** to Mahe-git2hub.
+
+**Required Attribution:**
+- Credit to: **Mahe-git2hub** 
+- License notice: "Used under MIT License"
+- Attribution must be visible to end users (About page, credits, etc.)
+
+**❌ Using this software without proper attribution is NOT acceptable and constitutes license violation.**
+
+See the [LICENSE](LICENSE) file for full terms and conditions.
 
 ## Contributing
 

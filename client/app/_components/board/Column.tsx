@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { Column as ColumnType, Tile as TileType } from '@/hooks/useBoardSocket'
-import { validateTileContent, validateAuthorName, validateColumnTitle, sanitizeInput, MAX_TILE_CONTENT_LENGTH, MAX_AUTHOR_NAME_LENGTH } from '@/utils/validation'
+import { validateTileContent, validateAuthorName, validateColumnTitle, sanitizeInput, getCharacterCount, MAX_TILE_CONTENT_LENGTH, MAX_AUTHOR_NAME_LENGTH } from '@/utils/validation'
 import Tile from './Tile'
 
 interface ColumnProps {
@@ -167,7 +167,7 @@ export default function Column({
                   style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
                 />
                 <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {[...tileAuthor].length}/{MAX_AUTHOR_NAME_LENGTH} characters
+                  {getCharacterCount(tileAuthor)}/{MAX_AUTHOR_NAME_LENGTH} characters
                 </div>
               </div>
               
@@ -186,7 +186,7 @@ export default function Column({
                   autoFocus
                 />
                 <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {[...newTileContent].length}/{MAX_TILE_CONTENT_LENGTH} characters
+                  {getCharacterCount(newTileContent)}/{MAX_TILE_CONTENT_LENGTH} characters
                 </div>
               </div>
               

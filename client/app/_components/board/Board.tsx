@@ -226,9 +226,16 @@ export default function Board({ boardId, adminKey, isAdmin = false }: BoardProps
       {/* Typing Indicator */}
       <TypingIndicator typingUsers={typingUsers} />
 
-      {/* Auto-delete warning */}
-      <div className="fixed bottom-4 left-4 text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-lg">
-        Board auto-deletes after 30min of inactivity
+      {/* Auto-delete warning and attribution */}
+      <div className="fixed bottom-4 left-4 space-y-2">
+        <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-lg">
+          Board auto-deletes after 30min of inactivity
+        </div>
+        <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-lg">
+          Created by{' '}
+          <span className="font-medium text-gray-600 dark:text-gray-300">Mahe-git2hub</span>
+          {' '}• MIT License
+        </div>
       </div>
 
       {/* Toast Notifications */}

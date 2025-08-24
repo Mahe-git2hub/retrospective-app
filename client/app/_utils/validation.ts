@@ -10,7 +10,17 @@ export interface ValidationResult {
 
 // Helper function to count UTF-8 characters (including emojis) properly
 function getCharacterCount(str: string): number {
-  return [...str].length
+  // Use a more compatible approach that works with ES5 target
+  let count = 0
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i)
+    // Skip low surrogate pairs (they're part of the previous character)
+    if (code >= 0xDC00 && code <= 0xDFFF) {
+      continue
+    }
+    count++
+  }
+  return count
 }
 
 export function validateTileContent(content: string): ValidationResult {
@@ -87,3 +97,6 @@ export function sanitizeInput(input: string): string {
   // Join lines back and remove excessive newlines (more than 2 consecutive)
   return sanitizedLines.join('\n').replace(/\n{3,}/g, '\n\n')
 }
+
+// Export the character count function for use in components
+export { getCharacterCount }
