@@ -97,7 +97,7 @@ export default function Column({
   )
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 min-h-[600px] flex flex-col">
+    <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 rounded-xl p-5 min-h-[600px] flex flex-col shadow-sm border border-gray-200 dark:border-gray-700">
       {/* Column Header */}
       <div className="flex items-center justify-between mb-4">
         {isEditingTitle ? (
@@ -121,8 +121,8 @@ export default function Column({
         )}
 
         <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-full">
-            {column.tiles.length}
+          <span className="text-xs font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-700 px-3 py-1.5 rounded-full shadow-sm border border-gray-200 dark:border-gray-600">
+            {column.tiles.length} cards
           </span>
           
           {isAdmin && (
@@ -144,15 +144,15 @@ export default function Column({
         {!isAddingTile ? (
           <button
             onClick={() => setIsAddingTile(true)}
-            className="w-full py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex items-center justify-center space-x-2"
+            className="w-full py-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-gray-500 dark:text-gray-400 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200 flex items-center justify-center space-x-2 group"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
-            <span>Add a card</span>
+            <span className="font-medium">Add a card</span>
           </button>
         ) : (
-          <div className="bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border rounded-lg p-3 shadow-sm">
+          <div className="bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border rounded-xl p-4 shadow-lg">
             <div className="space-y-3">
               <input
                 type="text"
@@ -192,7 +192,7 @@ export default function Column({
                   <button
                     onClick={handleAddTile}
                     disabled={!newTileContent.trim()}
-                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium transition-colors shadow-sm"
                   >
                     Add Card
                   </button>
@@ -204,7 +204,7 @@ export default function Column({
       </div>
 
       {/* Tiles */}
-      <div className="space-y-3 flex-1">
+      <div className="space-y-4 flex-1">
         {sortedTiles.map((tile: TileType) => (
           <Tile
             key={tile.id}

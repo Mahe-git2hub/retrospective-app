@@ -59,6 +59,7 @@ export interface UseBoardSocketReturn {
   typingUsers: Record<string, boolean>
   addTile: (columnId: string, content: string, author?: string) => void
   revealTile: (tileId: string) => void
+  revealAllTiles: () => void
   voteTile: (tileId: string) => void
   createColumn: (title: string) => void
   updateColumn: (columnId: string, title: string) => void
@@ -183,6 +184,10 @@ export function useBoardSocket(boardId: string, adminKey?: string): UseBoardSock
     sendMessage('client:tile:reveal', { tileId })
   }
 
+  const revealAllTiles = () => {
+    sendMessage('client:board:reveal_all', {})
+  }
+
   const voteTile = (tileId: string) => {
     sendMessage('client:tile:vote', { tileId })
   }
@@ -217,6 +222,7 @@ export function useBoardSocket(boardId: string, adminKey?: string): UseBoardSock
     typingUsers,
     addTile,
     revealTile,
+    revealAllTiles,
     voteTile,
     createColumn,
     updateColumn,

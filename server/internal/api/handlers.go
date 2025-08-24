@@ -33,21 +33,25 @@ func (s *Server) CreateBoard(w http.ResponseWriter, r *http.Request) {
 	adminKey := uuid.New().String()
 
 	// Create default columns
+	col1ID := uuid.New().String()
+	col2ID := uuid.New().String()
+	col3ID := uuid.New().String()
+	
 	columns := map[string]*models.Column{
-		uuid.New().String(): {
-			ID:    uuid.New().String(),
+		col1ID: {
+			ID:    col1ID,
 			Title: "What went well?",
 			Order: 0,
 			Tiles: []*models.Tile{},
 		},
-		uuid.New().String(): {
-			ID:    uuid.New().String(),
+		col2ID: {
+			ID:    col2ID,
 			Title: "What could be improved?",
 			Order: 1,
 			Tiles: []*models.Tile{},
 		},
-		uuid.New().String(): {
-			ID:    uuid.New().String(),
+		col3ID: {
+			ID:    col3ID,
 			Title: "Action items",
 			Order: 2,
 			Tiles: []*models.Tile{},

@@ -25,6 +25,7 @@ export default function Board({ boardId, adminKey, isAdmin = false }: BoardProps
     typingUsers,
     addTile,
     revealTile,
+    revealAllTiles,
     voteTile,
     createColumn,
     updateColumn,
@@ -145,6 +146,15 @@ export default function Board({ boardId, adminKey, isAdmin = false }: BoardProps
 
             {isAdmin && (
               <>
+                <button
+                  onClick={revealAllTiles}
+                  className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2"
+                  title="Reveal all hidden tiles"
+                >
+                  <span>👁</span>
+                  <span>Reveal All</span>
+                </button>
+
                 <button
                   onClick={copyParticipantLink}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2"

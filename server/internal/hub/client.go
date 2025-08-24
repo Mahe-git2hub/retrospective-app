@@ -111,6 +111,10 @@ func (c *Client) handleMessage(msg models.WebSocketMessage) {
 		if c.isAdmin {
 			c.handleRevealTile(msg.Payload)
 		}
+	case "client:board:reveal_all":
+		if c.isAdmin {
+			c.handleRevealAll(msg.Payload)
+		}
 	case "client:tile:vote":
 		c.handleVoteTile(msg.Payload)
 	case "client:column:create":
@@ -213,6 +217,36 @@ func (c *Client) handleRevealTile(payload interface{}) {
 				return
 			}
 		}
+	}
+}
+
+func (c *Client) handleRevealAll(payload interface{}) {
+	board, err := c.hub.store.GetBoard(c.boardID)
+	if err != nil {
+		logger.Errorf("Error getting board: %v", err)
+		return
+	}
+
+	// Reveal all hidden tiles across all columns
+	tilesRevealed := 0
+	for _, column := range board.Columns {
+		for _, tile := range column.Tiles {
+			if tile.IsHidden {
+				tile.IsHidden = false
+				tilesRevealed++
+			}
+		}
+	}
+
+	if tilesRevealed > 0 {
+		if err := c.hub.store.SaveBoard(board); err != nil {
+			logger.Errorf("Error saving board: %v", err)
+			return
+		}
+		logger.Infof("Admin revealed %d tiles on board %s", tilesRevealed, c.boardID)
+		c.broadcastBoardState()
+	} else {
+		logger.Debugf("No hidden tiles to reveal on board %s", c.boardID)
 	}
 }
 

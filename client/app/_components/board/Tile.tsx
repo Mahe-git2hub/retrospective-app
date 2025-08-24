@@ -19,7 +19,7 @@ export default function Tile({ tile, isAdmin, onReveal, onVote, onAddThread, cur
   const [isAddingThread, setIsAddingThread] = useState(false)
 
   const hasVoted = currentUserId && tile.voterIds.includes(currentUserId)
-  const isHidden = tile.isHidden && !isAdmin
+  const isHidden = tile.isHidden
 
   const handleAddThread = () => {
     if (newThreadContent.trim()) {
@@ -47,59 +47,74 @@ export default function Tile({ tile, isAdmin, onReveal, onVote, onAddThread, cur
   }
 
   return (
-    <div className="bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
-      {/* Admin Reveal Button */}
-      {isAdmin && tile.isHidden && (
-        <div className="p-2 border-b border-gray-200 dark:border-dark-border">
-          <button
-            onClick={() => onReveal(tile.id)}
-            className="w-full bg-yellow-500 hover:bg-yellow-600 text-white text-xs py-1 px-2 rounded font-medium transition-colors"
-          >
-            👁 Reveal Tile
-          </button>
-        </div>
-      )}
-
+    <div className={`border border-gray-200 dark:border-dark-border rounded-lg shadow-sm hover:shadow-md transition-all duration-200 ${
+      isHidden 
+        ? 'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 border-dashed' 
+        : 'bg-white dark:bg-dark-card'
+    }`}>
       {/* Tile Content */}
       <div className="p-4">
-        <div className="text-sm text-gray-900 dark:text-gray-100 mb-3 whitespace-pre-wrap">
-          {tile.content}
-        </div>
-
-        {tile.author && (
-          <div className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-            by {tile.author}
+        {/* Hidden state indicator */}
+        {isHidden && (
+          <div className="flex items-center justify-center mb-3 text-gray-500 dark:text-gray-400 text-xs">
+            <div className="flex items-center space-x-2 bg-gray-200 dark:bg-gray-700 rounded-full px-3 py-1">
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" />
+                <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
+              </svg>
+              <span>Hidden until revealed</span>
+            </div>
           </div>
         )}
 
-        {/* Vote Section */}
-        <div className="flex items-center justify-between">
+        <div className={`text-sm mb-3 whitespace-pre-wrap leading-relaxed ${
+          isHidden 
+            ? 'text-gray-400 dark:text-gray-500 filter blur-sm select-none' 
+            : 'text-gray-900 dark:text-gray-100'
+        }`}>
+          {isHidden ? 'Content hidden until admin reveals all tiles' : tile.content}
+        </div>
+
+        {tile.author && !isHidden && (
+          <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400 mb-3">
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+            </svg>
+            <span>{tile.author}</span>
+          </div>
+        )}
+
+        {/* Action Section */}
+        <div className={`flex items-center justify-between ${isHidden ? 'opacity-50 pointer-events-none' : ''}`}>
           <button
             onClick={() => onVote(tile.id)}
-            className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+            disabled={isHidden}
+            className={`flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
               hasVoted
-                ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 transform scale-105'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 hover:scale-105'
             }`}
           >
-            <span>👍</span>
-            <span>{tile.voterIds.length}</span>
+            <span className="text-sm">👍</span>
+            <span className="font-semibold">{tile.voterIds.length}</span>
           </button>
 
           <div className="flex items-center space-x-2">
             {tile.threads.length > 0 && (
               <button
                 onClick={() => setShowThreads(!showThreads)}
-                className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center space-x-1"
+                disabled={isHidden}
+                className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center space-x-1 px-2 py-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 <span>💬</span>
-                <span>{tile.threads.length}</span>
+                <span className="font-medium">{tile.threads.length}</span>
               </button>
             )}
 
             <button
               onClick={() => setIsAddingThread(!isAddingThread)}
-              className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              disabled={isHidden}
+              className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 px-2 py-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               title="Add comment"
             >
               💬+
