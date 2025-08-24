@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { Column as ColumnType, Tile as TileType } from '@/hooks/useBoardSocket'
-import { validateTileContent, validateAuthorName, validateColumnTitle, sanitizeInput } from '@/utils/validation'
+import { validateTileContent, validateAuthorName, validateColumnTitle, sanitizeInput, MAX_TILE_CONTENT_LENGTH, MAX_AUTHOR_NAME_LENGTH } from '@/utils/validation'
 import Tile from './Tile'
 
 interface ColumnProps {
@@ -108,6 +108,8 @@ export default function Column({
             onBlur={handleUpdateTitle}
             onKeyPress={(e) => e.key === 'Enter' && handleUpdateTitle()}
             className="font-semibold text-lg bg-transparent border-b-2 border-blue-500 focus:outline-none text-gray-900 dark:text-gray-100 flex-1 mr-2"
+            style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+            placeholder="Column title... emojis welcome! 📝"
             autoFocus
           />
         ) : (
@@ -115,6 +117,7 @@ export default function Column({
             className="font-semibold text-lg text-gray-900 dark:text-gray-100 flex-1 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
             onClick={() => isAdmin && setIsEditingTitle(true)}
             title={isAdmin ? 'Click to edit title' : ''}
+            style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
           >
             {column.title}
           </h3>
@@ -154,28 +157,42 @@ export default function Column({
         ) : (
           <div className="bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border rounded-xl p-4 shadow-lg">
             <div className="space-y-3">
-              <input
-                type="text"
-                placeholder="Your name (optional)"
-                value={tileAuthor}
-                onChange={(e) => setTileAuthor(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <textarea
-                ref={textareaRef}
-                placeholder="What would you like to add?"
-                value={newTileContent}
-                onChange={(e) => handleTileContentChange(e.target.value)}
-                onKeyPress={handleKeyPress}
-                onFocus={onStartTyping}
-                onBlur={onStopTyping}
-                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                rows={3}
-                autoFocus
-              />
+              <div>
+                <input
+                  type="text"
+                  placeholder="Your name (optional) - supports emojis! 😊"
+                  value={tileAuthor}
+                  onChange={(e) => setTileAuthor(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+                />
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {[...tileAuthor].length}/{MAX_AUTHOR_NAME_LENGTH} characters
+                </div>
+              </div>
+              
+              <div>
+                <textarea
+                  ref={textareaRef}
+                  placeholder="What would you like to add? Emojis and Unicode characters welcome! 🎉"
+                  value={newTileContent}
+                  onChange={(e) => handleTileContentChange(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  onFocus={onStartTyping}
+                  onBlur={onStopTyping}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+                  rows={3}
+                  autoFocus
+                />
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {[...newTileContent].length}/{MAX_TILE_CONTENT_LENGTH} characters
+                </div>
+              </div>
+              
               <div className="flex justify-between items-center">
                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                  Ctrl + Enter to add
+                  Ctrl + Enter to add • UTF-8 & Emojis supported
                 </div>
                 <div className="flex space-x-2">
                   <button

@@ -2,6 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Enhanced Unicode and Emoji Support */
+@layer base {
+  * {
+    font-feature-settings: "kern";
+    text-rendering: optimizeLegibility;
+  }
+  
+  /* Ensure proper emoji and Unicode character rendering */
+  body, input, textarea, button {
+    font-family: 
+      'Inter',
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      Roboto,
+      'Helvetica Neue',
+      Arial,
+      sans-serif,
+      'Apple Color Emoji',
+      'Segoe UI Emoji',
+      'Segoe UI Symbol',
+      'Noto Color Emoji' !important;
+  }
+}
+
 :root {
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;

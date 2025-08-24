@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Tile as TileType, Thread } from '@/hooks/useBoardSocket'
+import { MAX_THREAD_CONTENT_LENGTH, MAX_AUTHOR_NAME_LENGTH } from '@/utils/validation'
 
 interface TileProps {
   tile: TileType
@@ -67,11 +68,14 @@ export default function Tile({ tile, isAdmin, onReveal, onVote, onAddThread, cur
           </div>
         )}
 
-        <div className={`text-sm mb-3 whitespace-pre-wrap leading-relaxed ${
-          isHidden 
-            ? 'text-gray-400 dark:text-gray-500 filter blur-sm select-none' 
-            : 'text-gray-900 dark:text-gray-100'
-        }`}>
+        <div 
+          className={`text-sm mb-3 whitespace-pre-wrap leading-relaxed ${
+            isHidden 
+              ? 'text-gray-400 dark:text-gray-500 filter blur-sm select-none' 
+              : 'text-gray-900 dark:text-gray-100'
+          }`}
+          style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+        >
           {isHidden ? 'Content hidden until admin reveals all tiles' : tile.content}
         </div>
 
@@ -80,7 +84,7 @@ export default function Tile({ tile, isAdmin, onReveal, onVote, onAddThread, cur
             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
             </svg>
-            <span>{tile.author}</span>
+            <span style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>{tile.author}</span>
           </div>
         )}
 
@@ -126,20 +130,34 @@ export default function Tile({ tile, isAdmin, onReveal, onVote, onAddThread, cur
         {isAddingThread && (
           <div className="mt-3 pt-3 border-t border-gray-200 dark:border-dark-border">
             <div className="space-y-2">
-              <input
-                type="text"
-                placeholder="Your name (optional)"
-                value={threadAuthor}
-                onChange={(e) => setThreadAuthor(e.target.value)}
-                className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-              />
-              <textarea
-                placeholder="Add a comment..."
-                value={newThreadContent}
-                onChange={(e) => setNewThreadContent(e.target.value)}
-                className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 resize-none"
-                rows={2}
-              />
+              <div>
+                <input
+                  type="text"
+                  placeholder="Your name (optional) 😊"
+                  value={threadAuthor}
+                  onChange={(e) => setThreadAuthor(e.target.value)}
+                  className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+                />
+                <div className="text-xs text-gray-400 mt-1">
+                  {[...threadAuthor].length}/{MAX_AUTHOR_NAME_LENGTH}
+                </div>
+              </div>
+              
+              <div>
+                <textarea
+                  placeholder="Add a comment... Emojis welcome! 🎉"
+                  value={newThreadContent}
+                  onChange={(e) => setNewThreadContent(e.target.value)}
+                  className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 resize-none"
+                  style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+                  rows={2}
+                />
+                <div className="text-xs text-gray-400 mt-1">
+                  {[...newThreadContent].length}/{MAX_THREAD_CONTENT_LENGTH}
+                </div>
+              </div>
+              
               <div className="flex justify-end space-x-1">
                 <button
                   onClick={() => setIsAddingThread(false)}
@@ -165,11 +183,17 @@ export default function Tile({ tile, isAdmin, onReveal, onVote, onAddThread, cur
             <div className="space-y-2">
               {tile.threads.map((thread: Thread) => (
                 <div key={thread.id} className="bg-gray-50 dark:bg-gray-800 rounded p-2">
-                  <div className="text-xs text-gray-900 dark:text-gray-100 mb-1">
+                  <div 
+                    className="text-xs text-gray-900 dark:text-gray-100 mb-1 whitespace-pre-wrap"
+                    style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+                  >
                     {thread.content}
                   </div>
                   {thread.author && (
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                    <div 
+                      className="text-xs text-gray-500 dark:text-gray-400"
+                      style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+                    >
                       by {thread.author}
                     </div>
                   )}
