@@ -196,7 +196,7 @@ The application follows a clean architecture pattern:
 
 This project is licensed under the MIT License with attribution requirements.
 
-**Copyright (c) 2024 Mahe-git2hub**
+**Copyright (c) 2025 Mahe-git2hub**
 
 ### Usage Requirements
 
